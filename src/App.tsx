@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { Dumbbell, Monitor, Moon, Sun } from 'lucide-react'
+import { Dumbbell, History as HistoryIcon, ListTree, Settings as SettingsIcon } from 'lucide-react'
 import Home from './pages/Home'
 import QueueEditor from './pages/QueueEditor'
 import History from './pages/History'
 import Settings from './pages/Settings'
 import { loadState, saveState, exportJSON, importJSON, AppState } from './lib/storage'
-import { addHistoryForCurrentDay, advanceToNextDay, setSplit, totalAttended } from './lib/queue'
+import { addHistoryForCurrentDay, advanceToNextDay, setSplit } from './lib/queue'
 
 const THEME_KEY = 'wusiit.theme'
 const WORKOUT_TIMER_END_KEY = 'wusiit.workout.timerEnd'
@@ -48,6 +48,8 @@ export default function App(){
     return (t === 'light' || t === 'dark') ? t : 'system'
   })
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [templateDraftItems, setTemplateDraftItems] = useState<{name:string,description?:string}[] | null>(null)
+  const [templateDraftToken, setTemplateDraftToken] = useState(0)
 
   // apply effective theme
   useEffect(()=>{
@@ -190,38 +192,33 @@ export default function App(){
     setState(next)
   }
 
-  function applyTemplate(preset: {name:string,description?:string}[]){
-    const next = {...state}
-    setSplit(next, preset)
-    setState(next)
-    setView('edit')
-    setIsTemplateModalOpen(false)
-  }
-
   function handleUseTemplate(templateId: 'ppl'|'5day'|'arnold'){
+    let preset: {name:string,description?:string}[]
     if(templateId === 'ppl'){
-      applyTemplate([
+      preset = [
         {name:'Push', description:'Bench press\nIncline dumbbell press\nShoulder press\nLateral raises\nTriceps pushdown'},
         {name:'Pull', description:'Pull-ups\nLat pulldown\nBarbell row\nFace pull\nBicep curls'},
         {name:'Legs', description:'Squats\nRomanian deadlift\nLeg press\nLeg curls\nCalf raises'}
-      ])
-      return
-    }
-    if(templateId === 'arnold'){
-      applyTemplate([
+      ]
+    } else if(templateId === 'arnold'){
+      preset = [
         {name:'Chest + Back', description:'Bench press\nIncline press\nPull-ups\nRows\nPulldowns'},
         {name:'Shoulders + Arms', description:'Overhead press\nLateral raises\nCurls\nSkull crushers\nHammer curls'},
         {name:'Legs', description:'Squats\nLunges\nLeg press\nHamstring curls\nCalves'}
-      ])
-      return
+      ]
+    } else {
+      preset = [
+        {name:'Back', description:'Lat machine top\nLat machine bottom\nRowing\nOne-arm rowing'},
+        {name:'Chest', description:'Bench flat\nBench incline\nBench decline\nFlys\nPushups'},
+        {name:'Biceps', description:'Curls\nHammer\nBarbell\nPreacher'},
+        {name:'Shoulder', description:'Press\nLateral\nFront\nShrugs'},
+        {name:'Legs', description:'Squats\nLunges\nExtensions\nPress\nCalves'}
+      ]
     }
-    applyTemplate([
-      {name:'Back', description:'Lat machine top\nLat machine bottom\nRowing\nOne-arm rowing'},
-      {name:'Chest', description:'Bench flat\nBench incline\nBench decline\nFlys\nPushups'},
-      {name:'Biceps', description:'Curls\nHammer\nBarbell\nPreacher'},
-      {name:'Shoulder', description:'Press\nLateral\nFront\nShrugs'},
-      {name:'Legs', description:'Squats\nLunges\nExtensions\nPress\nCalves'}
-    ])
+    setTemplateDraftItems(preset)
+    setTemplateDraftToken((prev) => prev + 1)
+    setView('edit')
+    setIsTemplateModalOpen(false)
   }
 
   function handleExport(){
@@ -280,38 +277,52 @@ export default function App(){
     setState(prev => ({...prev, history: []}))
   }
 
+  function handleSkipDayLock(){
+    if(!workoutDoneDate) return
+    setState(prev => {
+      const next = { ...prev }
+      advanceToNextDay(next)
+      return next
+    })
+    setWorkoutDoneDate('')
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-black">
       <div className="w-full max-w-md mx-auto min-h-screen flex flex-col p-4">
-        <header className="mb-4 flex items-center justify-between pb-3 border-b border-black/15 dark:border-white/20">
-          <div>
+        <header className="mb-4 flex items-center justify-between">
+          <button className="text-left" onClick={()=>setView('home')} aria-label="Go to home">
             <h1 className="text-xl font-medium text-black dark:text-white brand-logo">Wusiit</h1>
             <div className="text-[10px] uppercase text-black/60 dark:text-white/60">What split is it today?</div>
-          </div>
-          <div>
-            <button aria-label="theme" className="p-2 rounded border border-black/20 dark:border-white/30 bg-white dark:bg-black text-black dark:text-white" onClick={()=>{
-              const next = themePref === 'system' ? 'dark' : themePref === 'dark' ? 'light' : 'system'
-              setThemePref(next as ThemePref)
-              if(next === 'system') localStorage.removeItem(THEME_KEY)
-              else localStorage.setItem(THEME_KEY, next)
-            }}>
-              {themePref === 'system' ? (
-                <Monitor size={18} strokeWidth={1.8} />
-              ) : themePref === 'dark' ? (
-                <Moon size={18} strokeWidth={1.8} />
-              ) : (
-                <Sun size={18} strokeWidth={1.8} />
-              )}
+          </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              className={`p-2 rounded-md border ${view==='edit' ? 'bg-black text-white border-black dark:bg-white dark:text-black dark:border-white' : 'border-black/20 dark:border-white/30 bg-white dark:bg-black text-black dark:text-white'}`}
+              onClick={()=>setView('edit')}
+              aria-label="Split"
+              title="Split"
+            >
+              <ListTree size={18} strokeWidth={1.8} />
+            </button>
+            <button
+              className={`p-2 rounded-md border ${view==='history' ? 'bg-black text-white border-black dark:bg-white dark:text-black dark:border-white' : 'border-black/20 dark:border-white/30 bg-white dark:bg-black text-black dark:text-white'}`}
+              onClick={()=>setView('history')}
+              aria-label="History"
+              title="History"
+            >
+              <HistoryIcon size={18} strokeWidth={1.8} />
+            </button>
+            <button
+              className={`p-2 rounded-md border ${view==='settings' ? 'bg-black text-white border-black dark:bg-white dark:text-black dark:border-white' : 'border-black/20 dark:border-white/30 bg-white dark:bg-black text-black dark:text-white'}`}
+              onClick={()=>setView('settings')}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <SettingsIcon size={18} strokeWidth={1.8} />
             </button>
           </div>
         </header>
-
-        <nav className="grid grid-cols-4 gap-2 mb-4">
-          <button className={`text-sm py-2.5 rounded-md ${view==='home' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white text-black dark:bg-black dark:text-white'}`} onClick={()=>setView('home')}>Home</button>
-          <button className={`text-sm py-2.5 rounded-md ${view==='edit' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white text-black dark:bg-black dark:text-white'}`} onClick={()=>setView('edit')}>Split</button>
-          <button className={`text-sm py-2.5 rounded-md ${view==='history' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white text-black dark:bg-black dark:text-white'}`} onClick={()=>setView('history')}>History</button>
-          <button className={`text-sm py-2.5 rounded-md ${view==='settings' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-white text-black dark:bg-black dark:text-white'}`} onClick={()=>setView('settings')}>Settings</button>
-        </nav>
 
         <main className="flex-1">
           {view==='home' && (
@@ -323,14 +334,24 @@ export default function App(){
               actionLabel={homeActionLabel}
             />
           )}
-          {view==='edit' && <QueueEditor state={state} onSave={handleSaveSplit} />}
-          {view==='history' && <History state={state} />}
+          {view==='edit' && (
+            <QueueEditor
+              state={state}
+              onSave={handleSaveSplit}
+              templateDraftItems={templateDraftItems}
+              templateDraftToken={templateDraftToken}
+              onTemplateDraftApplied={()=>setTemplateDraftItems(null)}
+            />
+          )}
+          {view==='history' && <History state={state} workoutDoneDate={workoutDoneDate} />}
 
           {view==='settings' && (
             <Settings
               workoutMinutes={workoutMinutes}
               onWorkoutMinutesChange={handleWorkoutMinutesChange}
               onOpenTemplates={()=>setIsTemplateModalOpen(true)}
+              onSkipDayLock={handleSkipDayLock}
+              isDayLocked={isCompletedForToday}
               onExportClipboard={handleExportClipboard}
               onImport={handleImport}
               onResetHistory={handleResetHistory}
@@ -338,6 +359,13 @@ export default function App(){
               isTemplateModalOpen={isTemplateModalOpen}
               onCloseTemplateModal={()=>setIsTemplateModalOpen(false)}
               onUseTemplate={handleUseTemplate}
+              themePref={themePref}
+              onCycleTheme={()=>{
+                const next = themePref === 'system' ? 'dark' : themePref === 'dark' ? 'light' : 'system'
+                setThemePref(next as ThemePref)
+                if(next === 'system') localStorage.removeItem(THEME_KEY)
+                else localStorage.setItem(THEME_KEY, next)
+              }}
             />
           )}
         </main>

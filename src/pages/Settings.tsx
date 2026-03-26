@@ -1,4 +1,5 @@
 import React from 'react'
+import { Monitor, Moon, Sun } from 'lucide-react'
 
 type TemplateId = 'ppl' | '5day' | 'arnold'
 
@@ -6,6 +7,8 @@ type SettingsProps = {
   workoutMinutes: number
   onWorkoutMinutesChange: (value: string) => void
   onOpenTemplates: () => void
+  onSkipDayLock: () => void
+  isDayLocked: boolean
   onExportClipboard: () => void | Promise<void>
   onImport: () => void
   onResetHistory: () => void
@@ -13,12 +16,16 @@ type SettingsProps = {
   isTemplateModalOpen: boolean
   onCloseTemplateModal: () => void
   onUseTemplate: (templateId: TemplateId) => void
+  themePref: 'system' | 'light' | 'dark'
+  onCycleTheme: () => void
 }
 
 export default function Settings({
   workoutMinutes,
   onWorkoutMinutesChange,
   onOpenTemplates,
+  onSkipDayLock,
+  isDayLocked,
   onExportClipboard,
   onImport,
   onResetHistory,
@@ -26,10 +33,31 @@ export default function Settings({
   isTemplateModalOpen,
   onCloseTemplateModal,
   onUseTemplate,
+  themePref,
+  onCycleTheme,
 }: SettingsProps) {
   return (
     <>
       <section className="bg-white dark:bg-black rounded-lg space-y-3">
+        <div className="rounded-xl border border-black/15 dark:border-white/25 p-4 bg-black/[0.015] dark:bg-white/[0.02]">
+          <div className="text-[11px] uppercase tracking-wider text-black/60 dark:text-white/60">Appearance</div>
+          <button
+            className="mt-3 w-full py-2.5 rounded-lg border border-black/20 dark:border-white/30 bg-white dark:bg-black text-black dark:text-white flex items-center justify-center gap-2"
+            onClick={onCycleTheme}
+          >
+            {themePref === 'system' ? (
+              <Monitor size={16} strokeWidth={1.8} />
+            ) : themePref === 'dark' ? (
+              <Moon size={16} strokeWidth={1.8} />
+            ) : (
+              <Sun size={16} strokeWidth={1.8} />
+            )}
+            <span>
+              Theme: {themePref === 'system' ? 'System' : themePref === 'dark' ? 'Dark' : 'Light'}
+            </span>
+          </button>
+        </div>
+
         <div className="rounded-xl border border-black/15 dark:border-white/25 p-4 bg-black/[0.015] dark:bg-white/[0.02]">
           <div className="text-[11px] uppercase tracking-wider text-black/60 dark:text-white/60">Workout Settings</div>
           <label htmlFor="workout-minutes" className="block text-xs mt-3 text-black/70 dark:text-white/70">Workout Duration (Minutes)</label>
@@ -44,6 +72,13 @@ export default function Settings({
             className="mt-2 w-full rounded-lg border border-black/20 dark:border-white/30 bg-white dark:bg-black px-3 py-2.5 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-black/15 dark:focus:ring-white/25"
           />
           <button className="mt-3 w-full py-2.5 rounded-lg bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white" onClick={onOpenTemplates}>Use Templates</button>
+          <button
+            className="mt-2 w-full py-2.5 rounded-lg border border-black/20 dark:border-white/30 bg-white dark:bg-black text-black dark:text-white disabled:opacity-50"
+            onClick={onSkipDayLock}
+            disabled={!isDayLocked}
+          >
+            Skip Day Lock
+          </button>
         </div>
 
         <div className="rounded-xl border border-black/15 dark:border-white/25 p-4 bg-black/[0.015] dark:bg-white/[0.02]">

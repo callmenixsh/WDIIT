@@ -24,7 +24,21 @@ type SplitItem = {
   description?: string
 }
 
-function SortableDayCard({
+type QueueEditorProps = {
+  state: AppState
+  onSave: (s:{name:string,description?:string}[])=>void
+  templateDraftItems?: {name:string,description?:string}[] | null
+  templateDraftToken?: number
+  onTemplateDraftApplied?: () => void
+}
+
+function toQueueOrder(split: AppState['split'], nextIndex: number) {
+  if (!split.length) return [] as AppState['split']
+  const idx = ((nextIndex % split.length) + split.length) % split.length
+  return [...split.slice(idx), ...split.slice(0, idx)]
+}
+
+function SortableQueueCard({
   item,
   index,
   onNameChange,
@@ -70,13 +84,13 @@ function SortableDayCard({
           <button
             type="button"
             className="p-1 rounded-md text-black dark:text-white disabled:opacity-40"
-            aria-label="Delete day"
+            aria-label="Delete split item"
             disabled={!canRemove}
             onClick={() => onRemove(item.id)}
           >
             <Trash2 size={14} />
           </button>
-          <div className="text-[10px] font-medium leading-none uppercase tracking-wide text-black/60 dark:text-white/60 pt-1">Day {index + 1}</div>
+          <div className="text-[10px] font-medium leading-none uppercase tracking-wide text-black/60 dark:text-white/60 pt-1">Pos {index + 1}</div>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -94,7 +108,7 @@ function SortableDayCard({
       <input
         className="w-full p-2 rounded-md text-sm bg-white dark:bg-black text-black dark:text-white"
         value={item.name}
-        placeholder={`Split ${index + 1}`}
+        placeholder={`Workout ${index + 1}`}
         onChange={(e) => onNameChange(item.id, e.target.value)}
       />
 
@@ -114,23 +128,41 @@ function SortableDayCard({
   )
 }
 
-export default function QueueEditor({state, onSave}:{state:AppState,onSave:(s:{name:string,description?:string}[])=>void}){
+export default function QueueEditor({
+  state,
+  onSave,
+  templateDraftItems,
+  templateDraftToken,
+  onTemplateDraftApplied,
+}: QueueEditorProps){
   const nextId = useRef(0)
   const makeId = () => {
     nextId.current += 1
-    return `day-${nextId.current}`
+    return `queue-${nextId.current}`
   }
 
-  const mapSplitToItems = (split: AppState['split']): SplitItem[] => {
-    if (!split.length) return [{ id: makeId(), name: '', description: '' }]
-    return split.map((s) => ({ id: makeId(), name: s.name, description: s.description }))
+  const mapSplitToItems = (split: AppState['split'], nextIndex: number): SplitItem[] => {
+    const queue = toQueueOrder(split, nextIndex)
+    if (!queue.length) return [{ id: makeId(), name: '', description: '' }]
+    return queue.map((s) => ({ id: makeId(), name: s.name, description: s.description }))
   }
 
-  const [items, setItems] = useState<SplitItem[]>(() => mapSplitToItems(state.split))
+  const mapListToItems = (list: {name:string,description?:string}[]): SplitItem[] => {
+    if (!list.length) return [{ id: makeId(), name: '', description: '' }]
+    return list.map((s) => ({ id: makeId(), name: s.name, description: s.description }))
+  }
+
+  const [items, setItems] = useState<SplitItem[]>(() => mapSplitToItems(state.split, state.nextIndex))
+
+  useEffect(() => {
+    if(!templateDraftItems || templateDraftItems.length === 0) return
+    setItems(mapListToItems(templateDraftItems))
+    onTemplateDraftApplied?.()
+  }, [templateDraftToken])
 
   const stateSignature = useMemo(
-    () => JSON.stringify(state.split.map((s) => ({ name: (s.name || '').trim(), description: (s.description || '').trim() }))),
-    [state.split]
+    () => JSON.stringify(toQueueOrder(state.split, state.nextIndex).map((s) => ({ name: (s.name || '').trim(), description: (s.description || '').trim() }))),
+    [state.split, state.nextIndex]
   )
 
   const draftSignature = useMemo(
@@ -187,17 +219,16 @@ export default function QueueEditor({state, onSave}:{state:AppState,onSave:(s:{n
   }
 
   function handleCancel(){
-    setItems(mapSplitToItems(state.split))
+    setItems(mapSplitToItems(state.split, state.nextIndex))
   }
 
   return (
     <div className="bg-white dark:bg-black rounded-lg mb-6">
-
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((x) => x.id)} strategy={verticalListSortingStrategy}>
           <div className="mt-4 space-y-3">
             {items.map((item, i) => (
-              <SortableDayCard
+              <SortableQueueCard
                 key={item.id}
                 item={item}
                 index={i}
@@ -212,7 +243,7 @@ export default function QueueEditor({state, onSave}:{state:AppState,onSave:(s:{n
       </DndContext>
 
       <div className="mt-4">
-        <button className="w-full py-3 rounded-md bg-white dark:bg-black text-black dark:text-white border border-black/15 dark:border-white/20" onClick={addItem}>Add day</button>
+        <button className="w-full py-3 rounded-md bg-white dark:bg-black text-black dark:text-white border border-black/15 dark:border-white/20" onClick={addItem}>Add workout</button>
       </div>
 
       {isDirty && (

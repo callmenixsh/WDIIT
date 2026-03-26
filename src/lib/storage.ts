@@ -1,9 +1,6 @@
 export type DayEntry = {
   date: string // ISO date
-  splitIndex: number
   label: string
-  description?: string
-  attended: boolean
 }
 
 export type SplitItem = {
@@ -18,6 +15,7 @@ export type AppState = {
 }
 
 const KEY = 'wdiit.state.v1'
+const MAX_HISTORY_ENTRIES = 1000
 
 export const defaultState = (): AppState => ({
   split: [
@@ -29,16 +27,88 @@ export const defaultState = (): AppState => ({
   history: []
 })
 
+function normalizeHistoryEntry(entry: unknown): DayEntry | null {
+  if (!entry || typeof entry !== 'object') return null
+  const raw = entry as Record<string, unknown>
+
+  const date = typeof raw.date === 'string' ? raw.date.trim() : ''
+  const label = typeof raw.label === 'string' ? raw.label.trim() : ''
+  if (!date || !label) return null
+
+  return {
+    date,
+    label,
+  }
+}
+
+function normalizeState(parsed: unknown): AppState {
+  if (!parsed || typeof parsed !== 'object') return defaultState()
+  const raw = parsed as Record<string, unknown>
+
+  let split: SplitItem[] = []
+  if (Array.isArray(raw.split)) {
+    if (raw.split.length && typeof raw.split[0] === 'string') {
+      split = (raw.split as string[])
+        .map((s) => ({ name: String(s).trim() }))
+        .filter((item) => item.name)
+    } else {
+      split = (raw.split as unknown[])
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null
+          const source = item as Record<string, unknown>
+          const name = typeof source.name === 'string' ? source.name.trim() : ''
+          if (!name) return null
+          const description = typeof source.description === 'string' ? source.description.trim() : ''
+          return {
+            name,
+            ...(description ? { description } : {}),
+          }
+        })
+        .filter((item): item is SplitItem => Boolean(item))
+    }
+  }
+  if (!split.length) split = defaultState().split
+
+  const nextIndexRaw = typeof raw.nextIndex === 'number' ? raw.nextIndex : 0
+  const nextIndex = Number.isFinite(nextIndexRaw) ? Math.max(0, Math.floor(nextIndexRaw)) : 0
+
+  const seen = new Set<string>()
+  const history = Array.isArray(raw.history)
+    ? raw.history
+        .map(normalizeHistoryEntry)
+        .filter((item): item is DayEntry => Boolean(item))
+        .filter((item) => {
+          const key = `${item.date}|${item.label}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        .slice(0, MAX_HISTORY_ENTRIES)
+    : []
+
+  return { split, nextIndex, history }
+}
+
+function compactState(state: AppState): AppState {
+  return {
+    split: state.split.map((item) => ({
+      name: item.name,
+      ...(item.description ? { description: item.description } : {}),
+    })),
+    nextIndex: state.nextIndex,
+    history: state.history.map((item) => ({
+      date: item.date,
+      label: item.label,
+    })),
+  }
+}
+
 export function loadState(): AppState {
   try{
     const raw = localStorage.getItem(KEY)
     if(!raw) return defaultState()
     const parsed = JSON.parse(raw)
-    // migrate old format where split was string[]
-    if(parsed && Array.isArray(parsed.split) && parsed.split.length && typeof parsed.split[0] === 'string'){
-      parsed.split = parsed.split.map((s:string)=>({name:s}))
-    }
-    return parsed as AppState
+    return normalizeState(parsed)
   }catch(e){
     console.error('loadState',e)
     return defaultState()
@@ -46,25 +116,18 @@ export function loadState(): AppState {
 }
 
 export function saveState(s: AppState){
-  localStorage.setItem(KEY, JSON.stringify(s))
+  localStorage.setItem(KEY, JSON.stringify(compactState(normalizeState(s))))
 }
 
 export function exportJSON(s: AppState){
-  return JSON.stringify(s, null, 2)
+  return JSON.stringify(compactState(normalizeState(s)), null, 2)
 }
 
 export function importJSON(json: string): AppState | null{
   try{
     const parsed = JSON.parse(json)
     if(!parsed) return null
-    // accept both string[] and object[] for split
-    if(!Array.isArray(parsed.split)) return null
-    if(parsed.split.length && typeof parsed.split[0] === 'string'){
-      parsed.split = parsed.split.map((s:string)=>({name:s}))
-    }
-    if(typeof parsed.nextIndex !== 'number') parsed.nextIndex = 0
-    if(!Array.isArray(parsed.history)) parsed.history = []
-    return parsed as AppState
+    return normalizeState(parsed)
   }catch(e){
     return null
   }

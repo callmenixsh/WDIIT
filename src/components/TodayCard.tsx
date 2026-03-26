@@ -22,7 +22,7 @@ export default function TodayCard({state, onMark, onDoTomorrow, actionState, act
     const nextIdx = (idx + offset) % state.split.length
     return {
       offset,
-      name: state.split[nextIdx]?.name ?? `Day ${nextIdx + 1}`,
+      name: state.split[nextIdx]?.name ?? `Workout ${nextIdx + 1}`,
     }
   })
 
@@ -62,11 +62,11 @@ export default function TodayCard({state, onMark, onDoTomorrow, actionState, act
       </div>
 
       <div className="bg-white dark:bg-black p-4 rounded-lg border border-black/20 dark:border-white/30">
-        <div className="text-xs uppercase tracking-wide text-black/60 dark:text-white/60">Next 2 days</div>
+        <div className="text-xs uppercase tracking-wide text-black/60 dark:text-white/60">Coming Up</div>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {nextTwo.map((d) => (
             <div key={d.offset} className="rounded-md border border-black/10 dark:border-white/15 p-2.5 bg-black/[0.02] dark:bg-white/[0.03]">
-              <div className="text-[10px] font-medium tracking-wide text-black/55 dark:text-white/55">Day +{d.offset}</div>
+              <div className="text-[10px] font-medium tracking-wide text-black/55 dark:text-white/55">Up Next {d.offset}</div>
               <div className="text-sm font-semibold text-black dark:text-white truncate mt-0.5">{d.name}</div>
             </div>
           ))}
