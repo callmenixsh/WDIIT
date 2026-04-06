@@ -7,8 +7,6 @@ type SettingsProps = {
   workoutMinutes: number
   onWorkoutMinutesChange: (value: string) => void
   onOpenTemplates: () => void
-  onSkipDayLock: () => void
-  isDayLocked: boolean
   onExportClipboard: () => void | Promise<void>
   onImport: () => void
   onResetHistory: () => void
@@ -24,8 +22,6 @@ export default function Settings({
   workoutMinutes,
   onWorkoutMinutesChange,
   onOpenTemplates,
-  onSkipDayLock,
-  isDayLocked,
   onExportClipboard,
   onImport,
   onResetHistory,
@@ -72,13 +68,6 @@ export default function Settings({
             className="mt-2 w-full rounded-lg border border-black/20 dark:border-white/30 bg-white dark:bg-black px-3 py-2.5 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-black/15 dark:focus:ring-white/25"
           />
           <button className="mt-3 w-full py-2.5 rounded-lg bg-black text-white dark:bg-white dark:text-black border border-black dark:border-white" onClick={onOpenTemplates}>Use Templates</button>
-          <button
-            className="mt-2 w-full py-2.5 rounded-lg border border-black/20 dark:border-white/30 bg-white dark:bg-black text-black dark:text-white disabled:opacity-50"
-            onClick={onSkipDayLock}
-            disabled={!isDayLocked}
-          >
-            Skip Day Lock
-          </button>
         </div>
 
         <div className="rounded-xl border border-black/15 dark:border-white/25 p-4 bg-black/[0.015] dark:bg-white/[0.02]">

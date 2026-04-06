@@ -1,6 +1,6 @@
 import { AppState, DayEntry } from './storage'
 
-export function addHistoryForCurrentDay(state: AppState, description?: string){
+export function addHistoryForCurrentDay(state: AppState){
   const splitItem = state.split[0]
   const today = new Date().toISOString().slice(0, 10)
   const normalizedLabel = splitItem?.name ?? 'Workout 1'
@@ -31,8 +31,8 @@ export function advanceToNextDay(state: AppState){
   return state
 }
 
-export function markToday(state: AppState, description?: string){
-  addHistoryForCurrentDay(state, description)
+export function markToday(state: AppState){
+  addHistoryForCurrentDay(state)
   advanceToNextDay(state)
   return state
 }

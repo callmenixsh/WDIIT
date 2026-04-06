@@ -11,10 +11,7 @@ const THEME_KEY = 'wusiit.theme'
 const WORKOUT_TIMER_END_KEY = 'wusiit.workout.timerEnd'
 const WORKOUT_MINUTES_KEY = 'wusiit.workout.minutes'
 const LEGACY_WORKOUT_HOURS_KEY = 'wusiit.workout.hours'
-const WORKOUT_TIMER_TOKEN_KEY = 'wusiit.workout.timerToken'
-const WORKOUT_COMPLETED_TOKEN_KEY = 'wusiit.workout.completedToken'
-const WORKOUT_PENDING_DESC_KEY = 'wusiit.workout.pendingDesc'
-const WORKOUT_DONE_DATE_KEY = 'wusiit.workout.doneDate'
+const LAST_WORKOUT_DATE_KEY = 'wusiit.lastWorkoutDate'
 
 type ThemePref = 'system'|'light'|'dark'
 
@@ -38,10 +35,7 @@ export default function App(){
     }
     return 60
   })
-  const [workoutTimerToken, setWorkoutTimerToken] = useState<string>(()=>localStorage.getItem(WORKOUT_TIMER_TOKEN_KEY) || '')
-  const [completedTimerToken, setCompletedTimerToken] = useState<string>(()=>localStorage.getItem(WORKOUT_COMPLETED_TOKEN_KEY) || '')
-  const [pendingWorkoutDesc, setPendingWorkoutDesc] = useState<string>(()=>localStorage.getItem(WORKOUT_PENDING_DESC_KEY) || '')
-  const [workoutDoneDate, setWorkoutDoneDate] = useState<string>(()=>localStorage.getItem(WORKOUT_DONE_DATE_KEY) || '')
+  const [lastWorkoutDate, setLastWorkoutDate] = useState<string>(()=>localStorage.getItem(LAST_WORKOUT_DATE_KEY) || '')
   const [nowTs, setNowTs] = useState<number>(()=>Date.now())
   const [themePref, setThemePref] = useState<ThemePref>(()=>{
     const t = localStorage.getItem(THEME_KEY)
@@ -81,78 +75,36 @@ export default function App(){
   }, [workoutMinutes])
 
   useEffect(()=>{
-    if(workoutTimerToken) localStorage.setItem(WORKOUT_TIMER_TOKEN_KEY, workoutTimerToken)
-    else localStorage.removeItem(WORKOUT_TIMER_TOKEN_KEY)
-  }, [workoutTimerToken])
-
-  useEffect(()=>{
-    if(completedTimerToken) localStorage.setItem(WORKOUT_COMPLETED_TOKEN_KEY, completedTimerToken)
-  }, [completedTimerToken])
-
-  useEffect(()=>{
-    if(pendingWorkoutDesc) localStorage.setItem(WORKOUT_PENDING_DESC_KEY, pendingWorkoutDesc)
-    else localStorage.removeItem(WORKOUT_PENDING_DESC_KEY)
-  }, [pendingWorkoutDesc])
-
-  useEffect(()=>{
-    if(workoutDoneDate) localStorage.setItem(WORKOUT_DONE_DATE_KEY, workoutDoneDate)
-    else localStorage.removeItem(WORKOUT_DONE_DATE_KEY)
-  }, [workoutDoneDate])
+    if(lastWorkoutDate) localStorage.setItem(LAST_WORKOUT_DATE_KEY, lastWorkoutDate)
+    else localStorage.removeItem(LAST_WORKOUT_DATE_KEY)
+  }, [lastWorkoutDate])
 
   useEffect(()=>{
     const id = window.setInterval(()=>setNowTs(Date.now()), 30000)
     return ()=>window.clearInterval(id)
   },[])
 
-  useEffect(()=>{
-    if(!(workoutTimerEnd > 0 && nowTs >= workoutTimerEnd)) return
-    // Guard against duplicate writes (including React StrictMode double-effect runs).
-    if(!workoutTimerToken){
-      setWorkoutTimerEnd(0)
-      return
-    }
-    const persistedCompletedToken = localStorage.getItem(WORKOUT_COMPLETED_TOKEN_KEY) || ''
-    if(workoutTimerToken === completedTimerToken || workoutTimerToken === persistedCompletedToken){
-      setWorkoutTimerEnd(0)
-      setWorkoutTimerToken('')
-      return
-    }
-
-    // Persist completion token first so any immediate re-run is idempotent.
-    localStorage.setItem(WORKOUT_COMPLETED_TOKEN_KEY, workoutTimerToken)
+  function handleStartWorkout(){
+    if(workoutTimerEnd > 0) return
     const today = new Date().toISOString().slice(0, 10)
+    const minutes = Number.isFinite(workoutMinutes) && workoutMinutes > 0 ? workoutMinutes : 60
     setState(prev => {
       const next = { ...prev }
-      addHistoryForCurrentDay(next, pendingWorkoutDesc || undefined)
+      addHistoryForCurrentDay(next)
       return next
     })
-    setCompletedTimerToken(workoutTimerToken)
-    setWorkoutDoneDate(today)
-    setWorkoutTimerEnd(0)
-    setWorkoutTimerToken('')
-    setPendingWorkoutDesc('')
-  }, [nowTs, workoutTimerEnd, workoutTimerToken, completedTimerToken, pendingWorkoutDesc])
+    setLastWorkoutDate(today)
+    setWorkoutTimerEnd(Date.now() + minutes * 60 * 1000)
+  }
 
-  useEffect(()=>{
-    if(!workoutDoneDate) return
-    const today = new Date().toISOString().slice(0, 10)
-    if(workoutDoneDate === today) return
+  function handleSwitchToNextDay(){
+    if(!(workoutTimerEnd > 0 && nowTs >= workoutTimerEnd)) return
     setState(prev => {
       const next = { ...prev }
       advanceToNextDay(next)
       return next
     })
-    setWorkoutDoneDate('')
-  }, [workoutDoneDate])
-
-  function handleStartWorkout(desc?: string){
-    const today = new Date().toISOString().slice(0, 10)
-    if(nowTs < workoutTimerEnd || workoutDoneDate === today) return
-    const minutes = Number.isFinite(workoutMinutes) && workoutMinutes > 0 ? workoutMinutes : 60
-    const token = String(Date.now())
-    setPendingWorkoutDesc(desc || '')
-    setWorkoutTimerToken(token)
-    setWorkoutTimerEnd(Date.now() + minutes * 60 * 1000)
+    setWorkoutTimerEnd(0)
   }
 
   function handleDoTomorrow(){
@@ -165,16 +117,15 @@ export default function App(){
   }
 
   const isWorkoutInProgress = workoutTimerEnd > 0 && nowTs < workoutTimerEnd
-  const today = new Date().toISOString().slice(0, 10)
-  const isCompletedForToday = workoutDoneDate === today
+  const isReadyForNextDay = workoutTimerEnd > 0 && nowTs >= workoutTimerEnd
   const minutesRemaining = Math.max(0, Math.ceil((workoutTimerEnd - nowTs) / (60 * 1000)))
-  const homeActionState: 'idle'|'in-progress'|'completed' = isWorkoutInProgress
+  const homeActionState: 'idle'|'in-progress'|'ready-next-day' = isWorkoutInProgress
     ? 'in-progress'
-    : isCompletedForToday
-      ? 'completed'
+    : isReadyForNextDay
+      ? 'ready-next-day'
       : 'idle'
-  const homeActionLabel = isCompletedForToday
-    ? 'Good work, rest now'
+  const homeActionLabel = isReadyForNextDay
+    ? 'Switch to next day'
     : `Workout in progress (${minutesRemaining}m left)`
 
   function handleWorkoutMinutesChange(value: string){
@@ -259,30 +210,15 @@ export default function App(){
     if(!confirm('Reset all data?')) return
     localStorage.removeItem('wdiit.state.v1')
     localStorage.removeItem(WORKOUT_TIMER_END_KEY)
-    localStorage.removeItem(WORKOUT_TIMER_TOKEN_KEY)
-    localStorage.removeItem(WORKOUT_PENDING_DESC_KEY)
-    localStorage.removeItem(WORKOUT_COMPLETED_TOKEN_KEY)
-    localStorage.removeItem(WORKOUT_DONE_DATE_KEY)
+    localStorage.removeItem(LAST_WORKOUT_DATE_KEY)
     setState(loadState())
     setWorkoutTimerEnd(0)
-    setWorkoutTimerToken('')
-    setPendingWorkoutDesc('')
-    setWorkoutDoneDate('')
+    setLastWorkoutDate('')
   }
 
   function handleResetHistory(){
     if(!confirm('Reset history only?')) return
     setState(prev => ({...prev, history: []}))
-  }
-
-  function handleSkipDayLock(){
-    if(!workoutDoneDate) return
-    setState(prev => {
-      const next = { ...prev }
-      advanceToNextDay(next)
-      return next
-    })
-    setWorkoutDoneDate('')
   }
 
   return (
@@ -328,8 +264,10 @@ export default function App(){
               state={state}
               onStartWorkout={handleStartWorkout}
               onDoTomorrow={handleDoTomorrow}
+              onSwitchToNextDay={handleSwitchToNextDay}
               actionState={homeActionState}
               actionLabel={homeActionLabel}
+              lastWorkoutDate={lastWorkoutDate}
             />
           )}
           {view==='edit' && (
@@ -341,15 +279,13 @@ export default function App(){
               onTemplateDraftApplied={()=>setTemplateDraftItems(null)}
             />
           )}
-          {view==='history' && <History state={state} workoutDoneDate={workoutDoneDate} />}
+          {view==='history' && <History state={state} lastWorkoutDate={lastWorkoutDate} />}
 
           {view==='settings' && (
             <Settings
               workoutMinutes={workoutMinutes}
               onWorkoutMinutesChange={handleWorkoutMinutesChange}
               onOpenTemplates={()=>setIsTemplateModalOpen(true)}
-              onSkipDayLock={handleSkipDayLock}
-              isDayLocked={isCompletedForToday}
               onExportClipboard={handleExportClipboard}
               onImport={handleImport}
               onResetHistory={handleResetHistory}

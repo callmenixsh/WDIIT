@@ -4,26 +4,32 @@ import { AppState } from '../lib/storage'
 
 type HomeProps = {
   state: AppState
-  onStartWorkout: (desc?: string) => void
+  onStartWorkout: () => void
   onDoTomorrow: () => void
-  actionState: 'idle' | 'in-progress' | 'completed'
+  onSwitchToNextDay: () => void
+  actionState: 'idle' | 'in-progress' | 'ready-next-day'
   actionLabel: string
+  lastWorkoutDate: string
 }
 
 export default function Home({
   state,
   onStartWorkout,
   onDoTomorrow,
+  onSwitchToNextDay,
   actionState,
   actionLabel,
+  lastWorkoutDate,
 }: HomeProps) {
   return (
     <TodayCard
       state={state}
       onMark={onStartWorkout}
       onDoTomorrow={onDoTomorrow}
+      onSwitchToNextDay={onSwitchToNextDay}
       actionState={actionState}
       actionLabel={actionLabel}
+      lastWorkoutDate={lastWorkoutDate}
     />
   )
 }

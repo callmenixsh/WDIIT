@@ -5,7 +5,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 type HistoryProps = {
   state: AppState
-  workoutDoneDate?: string
+  lastWorkoutDate?: string
 }
 
 function parseIsoDate(value: string) {
@@ -106,13 +106,13 @@ function getDateRangeStats(state: AppState) {
   }
 }
 
-export default function History({ state, workoutDoneDate }: HistoryProps){
+export default function History({ state, lastWorkoutDate }: HistoryProps){
   const totalWorkoutDays = state.history.length
   const { currentStreak, highestStreak } = getStreakStats(state)
   const week = getRecentWeek(state)
   const { firstDateLabel, lastDateLabel, daysSinceLast } = getDateRangeStats(state)
   const todayIso = new Date().toISOString().slice(0, 10)
-  const todayStatus = workoutDoneDate === todayIso ? 'Completed today' : 'Not completed yet'
+  const todayStatus = lastWorkoutDate === todayIso ? 'Logged today' : 'Not logged today'
   const splitCounts = state.history.reduce<Record<string, number>>((acc, h) => {
     const key = h.label || 'Unknown'
     acc[key] = (acc[key] || 0) + 1
