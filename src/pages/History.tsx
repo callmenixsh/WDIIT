@@ -32,11 +32,18 @@ function getStreakStats(state: AppState) {
   const getGapDays = (a: Date, b: Date) => Math.round((a.getTime() - b.getTime()) / DAY_MS)
   const ALLOWED_GAP_DAYS = 2 // one missing day is allowed
 
-  let currentStreak = 1
-  for (let i = 1; i < sessionDates.length; i += 1) {
-    const gapDays = getGapDays(sessionDates[i - 1], sessionDates[i])
-    if (gapDays <= ALLOWED_GAP_DAYS) currentStreak += 1
-    else break
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const today = parseIsoDate(todayIso)
+  const latest = sessionDates[0]
+
+  let currentStreak = 0
+  if (today && latest && getGapDays(today, latest) <= ALLOWED_GAP_DAYS) {
+    currentStreak = 1
+    for (let i = 1; i < sessionDates.length; i += 1) {
+      const gapDays = getGapDays(sessionDates[i - 1], sessionDates[i])
+      if (gapDays <= ALLOWED_GAP_DAYS) currentStreak += 1
+      else break
+    }
   }
 
   let highestStreak = 1
@@ -173,7 +180,7 @@ export default function History({ state, lastWorkoutDate }: HistoryProps){
 
         <div className="mt-2 rounded-md border border-black/10 dark:border-white/15 px-3 py-2 text-xs text-black/65 dark:text-white/65">
           <span>First recorded: {firstDateLabel}</span>
-          <span className="mx-2">•</span>
+          <br/>
           <span>Latest recorded: {lastDateLabel}</span>
         </div>
 
